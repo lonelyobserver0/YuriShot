@@ -1,4 +1,4 @@
 #!/bin/bash
 
 cd bin
-./yurishot
+QT_QPA_PLATFORM=wayland ./yurishot

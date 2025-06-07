@@ -187,13 +187,19 @@ void ScreenshotAnimator::launchFlameshot(const QRect &region) {
 
     QStringList arguments;
     arguments << "gui" << "--region" << regionStr;
-    
+
     qDebug() << "Lancio Flameshot con:" << arguments.join(" ");
+
+    // *** PASSO FONDAMENTALE: NASCONDI LA TUA FINESTRA PRIMA DI LANCIARE FLAMESHOT ***
+    this->hide(); // Nasconde la finestra ScreenshotAnimator
 
     QProcess *flameshotProcess = new QProcess(this);
     connect(flameshotProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this](int exitCode, QProcess::ExitStatus exitStatus) {
         qDebug() << "Flameshot terminato con codice:" << exitCode;
+        // Mostra di nuovo la finestra solo se necessario per future interazioni,
+        // altrimenti chiudi l'app direttamente.
+        // this->show(); // Se vuoi che riappaia per un altro screenshot
         this->close(); // Chiudi l'animatore dopo che Flameshot ha fatto il suo lavoro
         // O QApplication::quit(); per terminare l'intera app se non hai altre finestre
     });
@@ -201,6 +207,6 @@ void ScreenshotAnimator::launchFlameshot(const QRect &region) {
 
     if (!flameshotProcess->waitForStarted(5000)) { // Attendi fino a 5 secondi per l'avvio
         qWarning() << "Errore: Flameshot non è riuscito ad avviarsi.";
-        this->close();
+        this->close(); // Chiudi se Flameshot non si avvia
     }
 }
