@@ -1,41 +1,50 @@
 #include "screenshotanimator.h"
-#include "animatedtriangle.h" // Includi la nuova classe AnimatedTriangle
+#include "animatedtriangle.h"
 #include <QGraphicsPolygonItem>
 #include <QTimer>
 #include <QDebug>
-#include <cmath> // Per std::hypot
-#include <QVBoxLayout> // Per QVBoxLayout
-#include <QApplication> // Per QApplication::quit()
+#include <cmath>
+#include <QVBoxLayout>
+#include <QApplication>
+#include <QEvent> // *** AGGIUNGI QUESTO INCLUDE ***
 
 ScreenshotAnimator::ScreenshotAnimator(QWidget *parent) : QWidget(parent) {
     scene = new QGraphicsScene(this);
     view = new QGraphicsView(scene, this);
     view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     view->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    view->setFrameStyle(QFrame::NoFrame); // Rimuove il bordo della view
-    view->setRenderHint(QPainter::Antialiasing); // Migliora la qualità di rendering
+    view->setFrameStyle(QFrame::NoFrame);
+    view->setRenderHint(QPainter::Antialiasing);
 
-    // Imposta la view per occupare tutta la finestra
+    view->setMouseTracking(true);
+    view->setInteractive(false); // Disabilita l'interazione standard del QGraphicsView
+
+    // *** INSTALLA L'EVENT FILTER SUL VIEWPORT DEL QGRAPHICSVIEW ***
+    // Il viewport è la parte effettiva del QGraphicsView che disegna la scena
+    view->viewport()->installEventFilter(this);
+
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(view);
     layout->setContentsMargins(0, 0, 0, 0);
 
-    // QRubberBand è solo un segnaposto per la visualizzazione della selezione,
-    // la tua animazione personalizzata la sostituirà visivamente.
     rubberBand = new QRubberBand(QRubberBand::Rectangle, this);
 
     selecting = false;
 
-    // Imposta la scena con le dimensioni dello schermo una volta che la finestra è visibile
     QTimer::singleShot(0, this, [this]() {
         scene->setSceneRect(this->rect());
-        setupTriangles(); // Popola la scena con i triangoli
+        setupTriangles();
     });
+
+    qDebug() << "ScreenshotAnimator initialized.";
 }
 
 ScreenshotAnimator::~ScreenshotAnimator() {
+    // Non è necessario disinstallare l'event filter esplicitamente
+    // se l'oggetto filtro (this) viene eliminato prima dell'oggetto filtrato (view->viewport()).
+    // In questo caso, view->viewport() è figlio di view che è figlio di this.
+    // L'ordine di distruzione assicura che sia corretto.
     delete rubberBand;
-    // scene e view vengono eliminati automaticamente perché figli del QWidget
 }
 
 void ScreenshotAnimator::setupTriangles() {
@@ -50,19 +59,14 @@ void ScreenshotAnimator::setupTriangles() {
             QPolygonF triangle1;
             triangle1 << QPointF(x, y)
                       << QPointF(x + triangleSize, y)
-                      << QPointF(x + triangleSize / 2, y + triangleSize / 2); // Vertice in basso al centro
+                      << QPointF(x + triangleSize / 2, y + triangleSize / 2);
             
-            // Secondo triangolo del "quadrato" (capovolto o adiacente)
             QPolygonF triangle2;
             triangle2 << QPointF(x, y + triangleSize / 2)
                       << QPointF(x + triangleSize / 2, y + triangleSize / 2)
-                      << QPointF(x, y); // Esempio semplice, puoi variare la tassellazione
+                      << QPointF(x, y);
 
-            // Più complesso: una tassellazione di triangoli equilateri o rettangoli divisi
-            // Per semplicità, creiamo solo alcuni per mostrare il concetto
-            
             // Ogni triangolo è un'istanza di AnimatedTriangle
-            // Nota: Colore iniziale nero semi-trasparente
             AnimatedTriangle *tri1 = new AnimatedTriangle(triangle1, Qt::black);
             scene->addItem(tri1);
 
@@ -73,43 +77,63 @@ void ScreenshotAnimator::setupTriangles() {
     qDebug() << "Triangoli creati:" << scene->items().count();
 }
 
+// *** IMPLEMENTAZIONE DELL'EVENT FILTER ***
+bool ScreenshotAnimator::eventFilter(QObject *obj, QEvent *event) {
+    // Controlla se l'evento proviene dal viewport del QGraphicsView
+    if (obj == view->viewport()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            // Reindirizza l'evento al tuo metodo mousePressEvent
+            this->mousePressEvent(static_cast<QMouseEvent*>(event));
+            return true; // Consuma l'evento, non lasciarlo propagare oltre
+        } else if (event->type() == QEvent::MouseMove) {
+            this->mouseMoveEvent(static_cast<QMouseEvent*>(event));
+            return true; // Consuma l'evento
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            this->mouseReleaseEvent(static_cast<QMouseEvent*>(event));
+            return true; // Consuma l'evento
+        }
+    }
+    // Per tutti gli altri oggetti o tipi di eventi, lascia che l'implementazione base li gestisca
+    return QWidget::eventFilter(obj, event);
+}
+
 void ScreenshotAnimator::mousePressEvent(QMouseEvent *event) {
+    qDebug() << "Mouse Pressed at:" << event->pos(); // DEBUG
     if (event->button() == Qt::LeftButton) {
         originPoint = event->pos();
         rubberBand->setGeometry(QRect(originPoint, QSize()));
         rubberBand->show();
         selecting = true;
-        // Inizia a nascondere i triangoli nell'area circostante
     }
+    // *** Rimuovi la chiamata a QWidget::mousePressEvent(event); ***
+    // L'eventFilter ha già gestito e consumato l'evento.
 }
 
 void ScreenshotAnimator::mouseMoveEvent(QMouseEvent *event) {
+    qDebug() << "Mouse Moved to:" << event->pos(); // DEBUG
     if (selecting) {
-        // Aggiorna le dimensioni del rubberBand per mostrare la selezione.
-        // La tua animazione personalizzata dei triangoli dovrà reagire a questo rettangolo.
         rubberBand->setGeometry(QRect(originPoint, event->pos()).normalized());
-        
-        // Attiva l'animazione dei triangoli nell'area di selezione corrente
         animateTrianglesInRegion(rubberBand->geometry());
     }
+    // *** Rimuovi la chiamata a QWidget::mouseMoveEvent(event); ***
 }
 
 void ScreenshotAnimator::mouseReleaseEvent(QMouseEvent *event) {
+    qDebug() << "Mouse Released at:" << event->pos(); // DEBUG
     if (selecting && event->button() == Qt::LeftButton) {
         selecting = false;
         rubberBand->hide();
 
         QRect selectedRect = QRect(originPoint, event->pos()).normalized();
 
-        // Assicurati che le dimensioni siano valide
         if (selectedRect.width() < 1) selectedRect.setWidth(1);
         if (selectedRect.height() < 1) selectedRect.setHeight(1);
         
         qDebug() << "Regione selezionata:" << selectedRect;
         
-        launchFlameshot(selectedRect); // Lancia Flameshot con la regione
-        // Potresti anche animare i triangoli rimanenti per scomparire o tornare normali
+        launchFlameshot(selectedRect);
     }
+    // *** Rimuovi la chiamata a QWidget::mouseReleaseEvent(event); ***
 }
 
 void ScreenshotAnimator::keyPressEvent(QKeyEvent *event) {
