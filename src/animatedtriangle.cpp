@@ -30,7 +30,13 @@ AnimatedTriangle::AnimatedTriangle(const QPolygonF &polygon, const QColor &color
 }
 
 void AnimatedTriangle::startFoldAnimation() {
-    if (foldAnimation->state() != QAbstractAnimation::Running && m_foldProgress < 1.0) {
+    // If we are currently resetting, stop that and start folding
+    if (foldAnimation->state() == QAbstractAnimation::Running && foldAnimation->endValue().toReal() == 0.0) {
+        foldAnimation->stop();
+        opacityAnimation->stop();
+    }
+
+    if (m_foldProgress < 1.0) { // Only animate if not already fully folded
         foldAnimation->setStartValue(m_foldProgress);
         foldAnimation->setEndValue(1.0);
         foldAnimation->start();
@@ -42,7 +48,13 @@ void AnimatedTriangle::startFoldAnimation() {
 }
 
 void AnimatedTriangle::resetAnimation() {
-    if (foldAnimation->state() != QAbstractAnimation::Running && m_foldProgress > 0.0) {
+    // If we are currently folding, stop that and start resetting
+    if (foldAnimation->state() == QAbstractAnimation::Running && foldAnimation->endValue().toReal() == 1.0) {
+        foldAnimation->stop();
+        opacityAnimation->stop();
+    }
+
+    if (m_foldProgress > 0.0) { // Only animate if not already fully reset
         foldAnimation->setStartValue(m_foldProgress);
         foldAnimation->setEndValue(0.0);
         foldAnimation->start();

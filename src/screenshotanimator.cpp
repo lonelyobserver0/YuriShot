@@ -132,6 +132,17 @@ void ScreenshotAnimator::mouseReleaseEvent(QMouseEvent *event) {
         qDebug() << "Regione selezionata:" << selectedRect;
         
         launchFlameshot(selectedRect);
+
+        // --- NEW: Reset all triangles or remove them ---
+        // Option A: Reset all animations (they will become visible again)
+        for (QGraphicsItem *item : scene->items()) {
+            if (AnimatedTriangle *triangle = dynamic_cast<AnimatedTriangle*>(item)) {
+                // If you want them to completely disappear, you could stop and set opacity to 0
+                // triangle->setOpacity(0.0); // This would make them instantly disappear
+                // Or:
+                triangle->resetAnimation(); // They will fade back in
+            }
+        }
     }
     // *** Rimuovi la chiamata a QWidget::mouseReleaseEvent(event); ***
 }
