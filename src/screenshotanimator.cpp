@@ -190,7 +190,7 @@ void ScreenshotAnimator::launchFlameshot(const QRect &region) {
 
     qDebug() << "Lancio Flameshot con:" << arguments.join(" ");
 
-    // *** PASSO FONDAMENTALE: NASCONDI LA TUA FINESTRA PRIMA DI LANCIARE FLAMESHOT ***
+    // *** NASCONDI LA FINESTRA PRIMA DI LANCIARE FLAMESHOT ***
     this->hide(); // Nasconde la finestra ScreenshotAnimator
 
     QProcess *flameshotProcess = new QProcess(this);
